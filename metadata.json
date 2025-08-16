@@ -1,0 +1,5 @@
+{
+  "name": "Neon Breakdown",
+  "description": "A dynamic retro-futuristic game inspired by Atari Breakout, using Gemini to generate levels and Imagen to create unique backgrounds. Control a neon paddle to break down walls of glowing bricks.",
+  "requestFramePermissions": []
+}
