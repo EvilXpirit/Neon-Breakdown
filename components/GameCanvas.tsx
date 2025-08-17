@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { Ball, Paddle, Brick } from '../types';
 import { 
   CANVAS_WIDTH, CANVAS_HEIGHT, PADDLE_WIDTH, PADDLE_HEIGHT, PADDLE_Y_OFFSET,
@@ -18,16 +18,31 @@ interface GameCanvasProps {
   isPaused: boolean;
 }
 
-const GameCanvas: React.FC<GameCanvasProps> = ({ levelLayout, onGameOver, onLevelComplete, updateScore, updateLives, lives, score, isPaused }) => {
+// Helper for playing sounds
+const playSound = (src: string) => {
+  const audio = new Audio(src);
+  audio.play();
+};
+
+const GameCanvas: React.FC<GameCanvasProps> = ({
+  levelLayout,
+  onGameOver,
+  onLevelComplete,
+  updateScore,
+  updateLives,
+  lives,
+  score,
+  isPaused,
+}) => {
+  const [localPause, setLocalPause] = useState(false); // For 1s pause after losing life
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameId = useRef<number | null>(null);
-
   const paddleRef = useRef<Paddle>({
     x: (CANVAS_WIDTH - PADDLE_WIDTH) / 2,
     width: PADDLE_WIDTH,
     height: PADDLE_HEIGHT,
   });
-
   const ballRef = useRef<Ball>({
     x: CANVAS_WIDTH / 2,
     y: CANVAS_HEIGHT - PADDLE_Y_OFFSET - PADDLE_HEIGHT - BALL_RADIUS,
@@ -35,21 +50,20 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ levelLayout, onGameOver, onLeve
     dx: BALL_SPEED * (Math.random() > 0.5 ? 1 : -1),
     dy: -BALL_SPEED,
   });
-
   const bricksRef = useRef<Brick[][]>([]);
 
   const resetBallAndPaddle = useCallback(() => {
     if (paddleRef.current) {
-        paddleRef.current.x = (CANVAS_WIDTH - PADDLE_WIDTH) / 2;
+      paddleRef.current.x = (CANVAS_WIDTH - PADDLE_WIDTH) / 2;
     }
     if (ballRef.current) {
-        ballRef.current = {
-            ...ballRef.current,
-            x: CANVAS_WIDTH / 2,
-            y: CANVAS_HEIGHT - PADDLE_Y_OFFSET - PADDLE_HEIGHT - BALL_RADIUS,
-            dx: BALL_SPEED * (Math.random() > 0.5 ? 1 : -1),
-            dy: -BALL_SPEED,
-        };
+      ballRef.current = {
+        ...ballRef.current,
+        x: CANVAS_WIDTH / 2,
+        y: CANVAS_HEIGHT - PADDLE_Y_OFFSET - PADDLE_HEIGHT - BALL_RADIUS,
+        dx: BALL_SPEED * (Math.random() > 0.5 ? 1 : -1),
+        dy: -BALL_SPEED,
+      };
     }
   }, []);
 
@@ -74,26 +88,23 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ levelLayout, onGameOver, onLeve
 
   const draw = useCallback((ctx: CanvasRenderingContext2D) => {
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    
     // Draw paddle
     if (paddleRef.current) {
-        drawNeonRect(ctx, paddleRef.current.x, CANVAS_HEIGHT - PADDLE_Y_OFFSET, paddleRef.current.width, paddleRef.current.height, NEON_CYAN);
+      drawNeonRect(ctx, paddleRef.current.x, CANVAS_HEIGHT - PADDLE_Y_OFFSET, paddleRef.current.width, paddleRef.current.height, NEON_CYAN);
     }
-
     // Draw ball
     if (ballRef.current) {
-        drawNeonCircle(ctx, ballRef.current.x, ballRef.current.y, ballRef.current.radius, NEON_MAGENTA);
+      drawNeonCircle(ctx, ballRef.current.x, ballRef.current.y, ballRef.current.radius, NEON_MAGENTA);
     }
-
     // Draw bricks
     bricksRef.current.forEach(row => {
       row.forEach(brick => {
         if (brick.health > 0) {
           const color = BRICK_COLORS[brick.type] || NEON_CYAN;
           drawNeonRect(ctx, brick.x, brick.y, brick.width, brick.height, color);
-          if (brick.type === 2) { // Add inner glow for tough bricks
-             ctx.fillStyle = `rgba(255, 255, 255, ${brick.health > 1 ? 0.5 : 0.2})`;
-             ctx.fillRect(brick.x + 5, brick.y + 5, brick.width - 10, brick.height - 10);
+          if (brick.type === 2) {
+            ctx.fillStyle = `rgba(255, 255, 255, ${brick.health > 1 ? 0.5 : 0.2})`;
+            ctx.fillRect(brick.x + 5, brick.y + 5, brick.width - 10, brick.height - 10);
           }
         }
       });
@@ -101,19 +112,23 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ levelLayout, onGameOver, onLeve
   }, []);
 
   const update = useCallback(() => {
+    if (localPause) return; // Skip updates if we're pausing after life lost
+
     const ball = ballRef.current;
     const paddle = paddleRef.current;
-
     if (!ball || !paddle) return;
-
     ball.x += ball.dx;
     ball.y += ball.dy;
 
     // Wall collision
-    if (ball.x + ball.radius > CANVAS_WIDTH || ball.x - ball.radius < 0) ball.dx *= -1;
-    if (ball.y - ball.radius < 0) ball.dy *= -1;
+    if (ball.x + ball.radius > CANVAS_WIDTH || ball.x - ball.radius < 0) {
+      ball.dx *= -1;
+    }
+    if (ball.y - ball.radius < 0) {
+      ball.dy *= -1;
+    }
 
-    // Paddle collision
+    // Paddle collision (board)
     if (
       ball.y + ball.radius > CANVAS_HEIGHT - PADDLE_Y_OFFSET &&
       ball.y - ball.radius < CANVAS_HEIGHT - PADDLE_Y_OFFSET + paddle.height &&
@@ -127,63 +142,73 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ levelLayout, onGameOver, onLeve
       let angle = collidePoint * (Math.PI / 3);
       ball.dx = BALL_SPEED * Math.sin(angle);
       ball.dy = -BALL_SPEED * Math.cos(angle);
+
+      // --- SOUND: Ball hits paddle
+      playSound('assets/ball.wav');
     }
-    
+
     // Bottom wall (lose life)
     if (ball.y + ball.radius > CANVAS_HEIGHT) {
-      updateLives(prev => prev - 1);
-      if (lives - 1 <= 0) {
-        onGameOver();
-      } else {
-        resetBallAndPaddle();
-      }
+      // Pause for 1s after losing life
+      setLocalPause(true); // Set local pause state
+      setTimeout(() => {
+        setLocalPause(false);
+        updateLives(prev => prev - 1);
+        if (lives - 1 <= 0) {
+          onGameOver();
+        } else {
+          resetBallAndPaddle();
+        }
+      }, 1000); // 1 second pause
+      return; // Stop update during pause
     }
-    
-    // Brick collision
-    let totalBricks = 0;
+
+    // Brick collision (glass)
+    let hitGlass = false;
     bricksRef.current.forEach(row => {
       row.forEach(brick => {
-         if (brick.health > 0) {
-            totalBricks++;
-            if (
-              ball.x > brick.x &&
-              ball.x < brick.x + brick.width &&
-              ball.y > brick.y &&
-              ball.y < brick.y + brick.height
-            ) {
-              ball.dy *= -1;
-              brick.health--;
-              if(brick.health <= 0) {
-                updateScore(prev => prev + POINTS_PER_BRICK);
-              }
+        if (brick.health > 0) {
+          if (
+            ball.x > brick.x &&
+            ball.x < brick.x + brick.width &&
+            ball.y > brick.y &&
+            ball.y < brick.y + brick.height
+          ) {
+            ball.dy *= -1;
+            brick.health--;
+            if (brick.health <= 0) {
+              updateScore(prev => prev + POINTS_PER_BRICK);
             }
-         }
+            hitGlass = true;
+          }
+        }
       });
     });
-
-    if (bricksRef.current.length > 0 && bricksRef.current.flat().every(b => b.health <= 0)) {
-        onLevelComplete();
+    // --- SOUND: Ball hits glass (brick)
+    if (hitGlass) {
+      playSound('assets/breaking-glass-83809.mp3');
     }
 
-  }, [lives, onGameOver, onLevelComplete, resetBallAndPaddle, updateLives, updateScore]);
-  
+    if (bricksRef.current.length > 0 && bricksRef.current.flat().every(b => b.health <= 0)) {
+      onLevelComplete();
+    }
+  }, [lives, onGameOver, onLevelComplete, resetBallAndPaddle, updateLives, updateScore, localPause]);
+
   const gameLoop = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    
     update();
     draw(ctx);
-    
     animationFrameId.current = requestAnimationFrame(gameLoop);
   }, [draw, update]);
-  
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const brickWidth = (CANVAS_WIDTH - 2 * BRICK_OFFSET_LEFT) / BRICK_COLS - BRICK_PADDING;
-    
+
     bricksRef.current = levelLayout.map((row, rowIndex) => 
       row.map((brickData, colIndex) => ({
         x: BRICK_OFFSET_LEFT + colIndex * (brickWidth + BRICK_PADDING),
@@ -196,12 +221,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ levelLayout, onGameOver, onLeve
     );
     resetBallAndPaddle();
   }, [levelLayout, resetBallAndPaddle]);
-  
+
   useEffect(() => {
-    if (!isPaused) {
+    if (!isPaused && !localPause) {
       animationFrameId.current = requestAnimationFrame(gameLoop);
     }
-    
     const updatePaddlePosition = (clientX: number) => {
       const canvas = canvasRef.current;
       if (!canvas || !paddleRef.current) return;
@@ -209,17 +233,14 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ levelLayout, onGameOver, onLeve
       const scaleX = canvas.width / rect.width;
       let relativeX = (clientX - rect.left) * scaleX;
       paddleRef.current.x = relativeX - paddleRef.current.width / 2;
-
       if (paddleRef.current.x < 0) paddleRef.current.x = 0;
       if (paddleRef.current.x + paddleRef.current.width > CANVAS_WIDTH) {
-          paddleRef.current.x = CANVAS_WIDTH - paddleRef.current.width;
+        paddleRef.current.x = CANVAS_WIDTH - paddleRef.current.width;
       }
     };
-
     const handleMouseMove = (e: MouseEvent) => {
       updatePaddlePosition(e.clientX);
     };
-
     const handleTouchMove = (e: TouchEvent) => {
       e.preventDefault(); // Prevent scrolling while playing
       const touch = e.touches[0];
@@ -227,19 +248,16 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ levelLayout, onGameOver, onLeve
         updatePaddlePosition(touch.clientX);
       }
     };
-
     const handleTouchStart = (e: TouchEvent) => {
-      e.preventDefault(); // Prevent scrolling while playing
-      const touch = e.touches[0];
+      e.preventDefault();
+      const touch = e.touches;
       if (touch) {
         updatePaddlePosition(touch.clientX);
       }
     };
-    
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('touchmove', handleTouchMove, { passive: false });
     window.addEventListener('touchstart', handleTouchStart, { passive: false });
-    
     return () => {
       if (animationFrameId.current) {
         cancelAnimationFrame(animationFrameId.current);
@@ -248,7 +266,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ levelLayout, onGameOver, onLeve
       window.removeEventListener('touchmove', handleTouchMove);
       window.removeEventListener('touchstart', handleTouchStart);
     };
-  }, [gameLoop]);
+  }, [gameLoop, isPaused, localPause]);
 
   return (
     <div className="w-full h-full flex items-center justify-center">
