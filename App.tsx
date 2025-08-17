@@ -146,7 +146,7 @@ const App: React.FC = () => {
     >
       <div className="w-full max-w-[95vh] bg-black/60 backdrop-blur-sm border-2 border-cyan-400 box-shadow-cyan p-2 sm:p-4 rounded-lg">
         <header className="flex flex-col sm:flex-row justify-between items-center gap-2 mb-2 sm:mb-4 border-b-2 border-magenta-500 pb-2">
-          <h1 className="text-xl sm:text-3xl font-press-start text-cyan-400 text-shadow-cyan">NEON BREAKDOWN</h1>
+          <h1 className="text-3xl sm:text-5xl font-extrabold text-cyan-400 drop-shadow-[0_0_8px_cyan]">NEON BREAKDOWN</h1>
           {gameState === GameState.PLAYING && <HUD score={score} lives={lives} level={level} />}
         </header>
         <main className="relative aspect-[4/3] w-full bg-black/50 rounded overflow-hidden">
