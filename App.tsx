@@ -6,6 +6,7 @@ import EndScreen from './components/EndScreen';
 import GameCanvas from './components/GameCanvas';
 import PauseScreen from './components/PauseScreen';
 import PauseButton from './components/common/PauseButton';
+import retroBg from  './components/assets/retroBg.png';
 import HUD from './components/HUD';
 import { generateLevelLayout } from './services/levelGenerator';
 
@@ -137,7 +138,7 @@ const App: React.FC = () => {
   return (
     <div 
       className="min-h-screen w-full flex flex-col items-center justify-center bg-black bg-cover bg-center p-2 sm:p-4"
-      style={{ backgroundImage: `url('assets/retro-bg.png')` }}
+      style={{ backgroundImage: `url(${retroBg})` }}
     >
       <div className="relative w-full max-w-[95vh] bg-black/60 backdrop-blur-sm border-2 border-cyan-400 box-shadow-cyan p-2 sm:p-4 rounded-lg">
       {gameState === GameState.PLAYING && (
