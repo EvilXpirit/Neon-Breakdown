@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { NEON_MAGENTA } from '../constants';
 
@@ -24,21 +23,34 @@ const HeartIcon: React.FC<{ color: string }> = ({ color }) => (
 
 const HUD: React.FC<HUDProps> = ({ score, lives, level }) => {
   return (
-    <div className="flex items-center space-x-4 sm:space-x-8 text-lg sm:text-xl font-orbitron">
-      <div className="text-cyan-400">
+    <div className="grid grid-cols-[auto_auto_1fr_auto] items-center gap-4 sm:gap-8 text-lg sm:text-xl font-orbitron">
+      <div className="text-cyan-400 whitespace-nowrap">
         LVL: <span className="font-bold">{level}</span>
       </div>
-      <div className="text-yellow-400">
+      <div className="text-yellow-400 whitespace-nowrap">
         SCORE: <span className="font-bold">{score}</span>
       </div>
-      <div className="flex items-center space-x-1">
-        <span className="text-magenta-500">LIVES:</span>
-        <div className="flex">
+      <div className="flex items-center">
+        <span className="text-magenta-500 whitespace-nowrap mr-2">LIVES:</span>
+        <div className="flex gap-1 w-24">
             {Array.from({ length: lives }).map((_, i) => (
                 <HeartIcon key={i} color={NEON_MAGENTA} />
             ))}
         </div>
       </div>
+      {/* {onPause && (
+        <button
+          onClick={onPause}
+          className="p-2 rounded-full bg-black/40 border-2 border-cyan-400 hover:bg-black/60 
+                     transition-all duration-300 hover:shadow-[0_0_10px_#0ff] touch-manipulation shrink-0"
+          aria-label="Pause game"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="#00ffff">
+            <rect x="6" y="4" width="4" height="16"/>
+            <rect x="14" y="4" width="4" height="16"/>
+          </svg>
+        </button>
+      )} */}
     </div>
   );
 };

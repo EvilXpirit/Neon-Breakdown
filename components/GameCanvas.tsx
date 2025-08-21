@@ -36,6 +36,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ levelLayout, onGameOver, onLeve
     dy: -BALL_SPEED,
   });
 
+  const lastTimeRef = useRef<number>(0);
   const bricksRef = useRef<Brick[][]>([]);
 
   const resetBallAndPaddle = useCallback(() => {
@@ -43,14 +44,16 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ levelLayout, onGameOver, onLeve
         paddleRef.current.x = (CANVAS_WIDTH - PADDLE_WIDTH) / 2;
     }
     if (ballRef.current) {
+        const angle = (Math.random() * Math.PI / 3) - (Math.PI / 6); // Random angle between -30 and 30 degrees
         ballRef.current = {
             ...ballRef.current,
             x: CANVAS_WIDTH / 2,
             y: CANVAS_HEIGHT - PADDLE_Y_OFFSET - PADDLE_HEIGHT - BALL_RADIUS,
-            dx: BALL_SPEED * (Math.random() > 0.5 ? 1 : -1),
-            dy: -BALL_SPEED,
+            dx: BALL_SPEED * Math.sin(angle),
+            dy: -BALL_SPEED * Math.cos(angle),
         };
     }
+    lastTimeRef.current = 0; // Reset time tracking after reset
   }, []);
 
   const drawNeonRect = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, color: string) => {
@@ -100,18 +103,30 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ levelLayout, onGameOver, onLeve
     });
   }, []);
 
-  const update = useCallback(() => {
+  const update = useCallback((deltaTime: number) => {
     const ball = ballRef.current;
     const paddle = paddleRef.current;
 
     if (!ball || !paddle) return;
 
-    ball.x += ball.dx;
-    ball.y += ball.dy;
+    // Convert speed from pixels per second to pixels per frame using deltaTime
+    const frameSpeedMultiplier = deltaTime / 1000; // Convert to seconds
+
+    ball.x += ball.dx * frameSpeedMultiplier;
+    ball.y += ball.dy * frameSpeedMultiplier;
 
     // Wall collision
-    if (ball.x + ball.radius > CANVAS_WIDTH || ball.x - ball.radius < 0) ball.dx *= -1;
-    if (ball.y - ball.radius < 0) ball.dy *= -1;
+    if (ball.x + ball.radius > CANVAS_WIDTH || ball.x - ball.radius < 0) {
+      ball.dx *= -1;
+      // Adjust position to prevent sticking to walls
+      ball.x = ball.x + ball.radius > CANVAS_WIDTH ? 
+               CANVAS_WIDTH - ball.radius : 
+               ball.radius;
+    }
+    if (ball.y - ball.radius < 0) {
+      ball.dy *= -1;
+      ball.y = ball.radius; // Adjust position to prevent sticking to ceiling
+    }
 
     // Paddle collision
     if (
@@ -127,6 +142,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ levelLayout, onGameOver, onLeve
       let angle = collidePoint * (Math.PI / 3);
       ball.dx = BALL_SPEED * Math.sin(angle);
       ball.dy = -BALL_SPEED * Math.cos(angle);
+      // Prevent ball from sticking to paddle
+      ball.y = CANVAS_HEIGHT - PADDLE_Y_OFFSET - ball.radius;
     }
     
     // Bottom wall (lose life)
@@ -151,7 +168,16 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ levelLayout, onGameOver, onLeve
               ball.y > brick.y &&
               ball.y < brick.y + brick.height
             ) {
-              ball.dy *= -1;
+              // Determine which side of the brick was hit
+              const hitFromBelow = ball.dy < 0 && ball.y > brick.y + brick.height / 2;
+              const hitFromAbove = ball.dy > 0 && ball.y < brick.y + brick.height / 2;
+              
+              if (hitFromBelow || hitFromAbove) {
+                ball.dy *= -1;
+              } else {
+                ball.dx *= -1;
+              }
+              
               brick.health--;
               if(brick.health <= 0) {
                 updateScore(prev => prev + POINTS_PER_BRICK);
@@ -167,13 +193,23 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ levelLayout, onGameOver, onLeve
 
   }, [lives, onGameOver, onLevelComplete, resetBallAndPaddle, updateLives, updateScore]);
   
-  const gameLoop = useCallback(() => {
+  const gameLoop = useCallback((timestamp: number) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
-    update();
+    // Calculate delta time
+    if (lastTimeRef.current === 0) {
+      lastTimeRef.current = timestamp;
+    }
+    const deltaTime = timestamp - lastTimeRef.current;
+    lastTimeRef.current = timestamp;
+
+    // Limit delta time to prevent huge jumps after tab switching
+    const cappedDeltaTime = Math.min(deltaTime, 32); // Cap at ~30 FPS worth of time
+    
+    update(cappedDeltaTime);
     draw(ctx);
     
     animationFrameId.current = requestAnimationFrame(gameLoop);
@@ -223,30 +259,57 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ levelLayout, onGameOver, onLeve
     const handleTouchMove = (e: TouchEvent) => {
       e.preventDefault(); // Prevent scrolling while playing
       const touch = e.touches[0];
-      if (touch) {
-        updatePaddlePosition(touch.clientX);
+      const canvas = canvasRef.current;
+      if (touch && canvas) {
+        const rect = canvas.getBoundingClientRect();
+        // Check if touch is within canvas bounds
+        if (
+          touch.clientX >= rect.left &&
+          touch.clientX <= rect.right &&
+          touch.clientY >= rect.top &&
+          touch.clientY <= rect.bottom
+        ) {
+          updatePaddlePosition(touch.clientX);
+        }
       }
     };
 
     const handleTouchStart = (e: TouchEvent) => {
       e.preventDefault(); // Prevent scrolling while playing
       const touch = e.touches[0];
-      if (touch) {
-        updatePaddlePosition(touch.clientX);
+      const canvas = canvasRef.current;
+      if (touch && canvas) {
+        const rect = canvas.getBoundingClientRect();
+        // Check if touch is within canvas bounds
+        if (
+          touch.clientX >= rect.left &&
+          touch.clientX <= rect.right &&
+          touch.clientY >= rect.top &&
+          touch.clientY <= rect.bottom
+        ) {
+          updatePaddlePosition(touch.clientX);
+        }
       }
     };
     
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('touchmove', handleTouchMove, { passive: false });
-    window.addEventListener('touchstart', handleTouchStart, { passive: false });
+    const canvas = canvasRef.current;
+    if (canvas) {
+      // Add event listeners to canvas instead of window
+      canvas.addEventListener('mousemove', handleMouseMove);
+      canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+      canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+    }
     
     return () => {
       if (animationFrameId.current) {
         cancelAnimationFrame(animationFrameId.current);
       }
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('touchmove', handleTouchMove);
-      window.removeEventListener('touchstart', handleTouchStart);
+      if (canvas) {
+        // Remove event listeners from canvas
+        canvas.removeEventListener('mousemove', handleMouseMove);
+        canvas.removeEventListener('touchmove', handleTouchMove);
+        canvas.removeEventListener('touchstart', handleTouchStart);
+      }
     };
   }, [gameLoop]);
 

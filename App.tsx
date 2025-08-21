@@ -105,21 +105,16 @@ const App: React.FC = () => {
         return (
           <>
             {levelLayout.length > 0 && (
-              <>
-                <GameCanvas
-                  levelLayout={levelLayout}
-                  onGameOver={handleGameOver}
-                  onLevelComplete={nextLevel}
-                  updateScore={setScore}
-                  updateLives={setLives}
-                  lives={lives}
-                  score={score}
-                  isPaused={gameState === GameState.PAUSED}
-                />
-                {gameState === GameState.PLAYING && (
-                  <PauseButton onPause={togglePause} />
-                )}
-              </>
+              <GameCanvas
+                levelLayout={levelLayout}
+                onGameOver={handleGameOver}
+                onLevelComplete={nextLevel}
+                updateScore={setScore}
+                updateLives={setLives}
+                lives={lives}
+                score={score}
+                isPaused={gameState === GameState.PAUSED}
+              />
             )}
             {gameState === GameState.PAUSED && (
               <PauseScreen 
@@ -144,16 +139,27 @@ const App: React.FC = () => {
       className="min-h-screen w-full flex flex-col items-center justify-center bg-black bg-cover bg-center p-2 sm:p-4"
       style={{ backgroundImage: `url('assets/retro-bg.png')` }}
     >
-      <div className="w-full max-w-[95vh] bg-black/60 backdrop-blur-sm border-2 border-cyan-400 box-shadow-cyan p-2 sm:p-4 rounded-lg">
+      <div className="relative w-full max-w-[95vh] bg-black/60 backdrop-blur-sm border-2 border-cyan-400 box-shadow-cyan p-2 sm:p-4 rounded-lg">
+      {gameState === GameState.PLAYING && (
+        <div className="absolute -top-12 sm:-top-4 -right-4 sm:-right-24 z-50">
+          <PauseButton onPause={togglePause} />
+        </div>
+      )}
         <header className="flex flex-col sm:flex-row justify-between items-center gap-2 mb-2 sm:mb-4 border-b-2 border-magenta-500 pb-2">
           <h1 className="text-xl sm:text-3xl font-press-start text-cyan-400 text-shadow-cyan">NEON BREAKDOWN</h1>
-          {gameState === GameState.PLAYING && <HUD score={score} lives={lives} level={level} />}
+          {gameState === GameState.PLAYING && (
+            <HUD 
+              score={score} 
+              lives={lives} 
+              level={level}
+            />
+          )}
         </header>
         <main className="relative aspect-[4/3] w-full bg-black/50 rounded overflow-hidden">
           {renderContent()}
         </main>
       </div>
-       <footer className="text-center mt-4 text-xs text-magenta-500">
+      <footer className="text-center mt-4 text-xs text-magenta-500">
         Retro-futuristic fun
       </footer>
     </div>

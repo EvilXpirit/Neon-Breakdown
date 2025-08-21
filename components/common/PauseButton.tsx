@@ -8,15 +8,15 @@ const PauseButton: React.FC<PauseButtonProps> = ({ onPause }) => {
   return (
     <button
       onClick={onPause}
-      className="absolute top-2 right-2 z-10 p-2 rounded-full bg-black/40 border-2 border-cyan-400 
+      className="p-3 sm:p-4 rounded-full bg-black/80 border-2 border-cyan-400 
                  hover:bg-black/60 transition-all duration-300 hover:shadow-[0_0_10px_#0ff]
-                 touch-manipulation"
+                 active:scale-95 touch-manipulation select-none"
       aria-label="Pause game"
     >
       <svg 
         xmlns="http://www.w3.org/2000/svg" 
-        width="24" 
-        height="24" 
+        width="28" 
+        height="28" 
         viewBox="0 0 24 24" 
         fill="#00ffff"
         className="drop-shadow-[0_0_3px_#00ffff]"

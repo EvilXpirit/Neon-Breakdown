@@ -10,7 +10,7 @@ export const PADDLE_Y_OFFSET = 30;
 
 // Ball
 export const BALL_RADIUS = 10;
-export const BALL_SPEED = 5;
+export const BALL_SPEED = 700; // pixels per second
 
 // Bricks
 export const BRICK_ROWS = 8;
